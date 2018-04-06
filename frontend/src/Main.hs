@@ -27,37 +27,70 @@ module Main where
 import            Prelude
 -- import            Reflex.Dom
 import            Reflex.Dom.Core
-import            Language.Javascript.JSaddle.Warp -- (run)
+import            Reflex.Dom.Core -- (liftJSM)
+import            Language.Javascript.JSaddle.Warp
+import            Language.Javascript.JSaddle       (liftJSM)
 -- import            Reflex.
 import            Test.Hspec
 -- import            Data.Text
 import            Control.Monad.Trans
 import            Control.Concurrent
 import            Control.Monad
--- import qualified  GHCJS.DOM.Window                  as DOM
+
+import qualified  GHCJS.DOM.Window                  as DOM
+import qualified  GHCJS.DOM                         as DOM
 import qualified  GHCJS.DOM                         as DOM (currentDocument, currentWindow)
+import qualified  JSDOM                             as DOM (syncPoint)
+import qualified  GHCJS.DOM.Document                as DOM -- (Document, createElement, getBody)
+import qualified  GHCJS.DOM.Element                 as DOM
+import qualified  GHCJS.DOM.HTMLElement             as DOM
 
 debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
+
+prnt = io . print
 
 -- hspec $ do
 main :: IO ()
 main = do
-  debugAndWait 3198 $ mainWidget $ do
+  debugAndWait 3198 $ do
+    let
+      p = io . putStrLn . ("p: " ++)
 
-    -- a <- testRender (text "test1")
-    -- if a == "test1" then pure () else error "asdasd"
-    -- testRender (text "test1") `shouldBe` "test1"
+    (Just doc) <- DOM.currentDocument
+    (Just sel) <- DOM.getBody doc
 
-    text " hi1"
+    mainWidget $ do
 
-    text " hi3"
+      -- a <- testRender (text "test1")
+      -- if a == "test1" then pure () else error "asdasd"
+      -- testRender (text "test1") `shouldBe` "test1"
 
-    testRender (text "test1") $ do
-      io $ threadDelay $ 1000 * 1000
-      pure ()
-      -- html `shouldReturn` "test1"
+      text " hi1"
+      text " hi3"
+
+
+
+      testRender (text "test1") $ do
+        -- io $ threadDelay $ 1000 * 1000 * 2
+        pbd1 <- getPostBuild  >>= delay 0.1
+        DOM.getInnerHTML sel >>= p
+        performEvent_ $ ffor pbd1 $ \_ -> do
+          jsm $ DOM.syncPoint
+          prnt 1
+          DOM.getInnerHTML sel >>= p
+
+
+        pure ()
+        -- html `shouldReturn` "test1"
+
+      DOM.getInnerHTML sel >>= p
+
+    DOM.getInnerHTML sel >>= p
 
   -- error "asdasd"
+
+
+jsm = liftJSM
 
 -- testRender :: MonadWidget t m => m a -> m Text
 -- testRender :: MonadWidget t m => m () -> m ()
