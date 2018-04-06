@@ -29,7 +29,7 @@ import            Prelude
 import            Reflex.Dom.Core
 import            Reflex.Dom.Core -- (liftJSM)
 import            Language.Javascript.JSaddle.Warp
-import            Language.Javascript.JSaddle       (liftJSM)
+import            Language.Javascript.JSaddle       (liftJSM, JSM)
 -- import            Reflex.
 import            Test.Hspec
 -- import            Data.Text
@@ -44,6 +44,7 @@ import qualified  JSDOM                             as DOM (syncPoint)
 import qualified  GHCJS.DOM.Document                as DOM -- (Document, createElement, getBody)
 import qualified  GHCJS.DOM.Element                 as DOM
 import qualified  GHCJS.DOM.HTMLElement             as DOM
+import            Data.Time
 
 debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
 
@@ -59,56 +60,73 @@ main = do
     (Just doc) <- DOM.currentDocument
     (Just sel) <- DOM.getBody doc
 
+
     mainWidget $ do
-
-      -- a <- testRender (text "test1")
-      -- if a == "test1" then pure () else error "asdasd"
-      -- testRender (text "test1") `shouldBe` "test1"
-
-      text " hi1"
-      text " hi3"
-
-
-
-      testRender (text "test1") $ do
-        -- io $ threadDelay $ 1000 * 1000 * 2
-        pbd1 <- getPostBuild  >>= delay 0.1
-        DOM.getInnerHTML sel >>= p
-        performEvent_ $ ffor pbd1 $ \_ -> do
-          jsm $ DOM.syncPoint
-          prnt 1
-          DOM.getInnerHTML sel >>= p
-
-
-        pure ()
-        -- html `shouldReturn` "test1"
-
-      DOM.getInnerHTML sel >>= p
+      pb <- getPostBuild
+      pb2 <- delay 0.1 pb
+      text " hi1 "
+      text " hi3 "
+      time <- io getCurrentTime
+      ticker <- tickLossy 0.1 time
+      as <- count ticker
+      display as
+      text " hi4 "
 
     DOM.getInnerHTML sel >>= p
 
-  -- error "asdasd"
+    io $ threadDelay $ 1000 * 1000
+    DOM.getInnerHTML sel >>= p
+
+    io $ threadDelay $ 1000 * 1000
+    DOM.getInnerHTML sel >>= p
+
+    mainWidget $ do
+      pb <- getPostBuild
+      pb2 <- delay 0.1 pb
+      text " hi1 "
+      text " hi3 "
+      time <- io getCurrentTime
+      ticker <- tickLossy 0.1 time
+      as <- count ticker
+      display as
+      text " hi4 "
+
+    DOM.getInnerHTML sel >>= p
+
+    io $ threadDelay $ 1000 * 1000
+    DOM.getInnerHTML sel >>= p
+
+    io $ threadDelay $ 1000 * 1000
+    DOM.getInnerHTML sel >>= p
 
 
 jsm = liftJSM
 
--- testRender :: MonadWidget t m => m a -> m Text
--- testRender :: MonadWidget t m => m () -> m ()
-testRender :: MonadWidget t m => m () -> m () -> m ()
-testRender attachee tests = do
-  (event, trigger) <- newTriggerEvent
-  showHide <- holdDyn True event
+-- testRender :: MonadWidget t m => m () -> JSM () -> JSM ()
+-- testRender attachee tests = do
 
-  dyn $ ffor showHide $ \case
-    True  -> do
-      attachee
-      tests
-      io $ trigger False
-      noop
+--   mainWidget attachee
+--   tests
 
-    False -> noop
+--   noop
 
-  noop
+-- -- testRender :: MonadWidget t m => m a -> m Text
+-- -- testRender :: MonadWidget t m => m () -> m ()
+-- testRender :: MonadWidget t m => m () -> m () -> m ()
+-- testRender attachee tests = do
+--   (event, trigger) <- newTriggerEvent
+--   showHide <- holdDyn True event
+
+--   dyn $ ffor showHide $ \case
+--     True  -> do
+--       attachee
+--       tests
+--       io $ trigger False
+--       noop
+
+--     False -> noop
+
+--   noop
 
 noop = pure ()
 io = liftIO
