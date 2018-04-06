@@ -23,4 +23,14 @@
     ghc = ["common" "backend" "frontend"];
     ghcjs = ["common" "frontend"];
   };
+
+
+  overrides = self: super: with pkgs.haskell.lib; {
+    jsaddle = dontHaddock (dontCheck (self.callCabal2nix "jsaddle" "${pkgs.fetchFromGitHub {
+      owner = "Wizek";
+      repo = "jsaddle";
+      rev = "4859ee6";
+      sha256 = "046lbng1mwhqcg9b4ybgdcvfqgh45848zfnfwib1ysicv64m0w0r";
+    }}/jsaddle" {}));
+  };
 })
