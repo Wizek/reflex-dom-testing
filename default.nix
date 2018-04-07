@@ -26,6 +26,8 @@
 
 
   overrides = self: super: with pkgs.haskell.lib; {
+    compose-ltr = dontCheck (super.compose-ltr);
+
     jsaddle = dontHaddock (dontCheck (self.callCabal2nix "jsaddle" "${pkgs.fetchFromGitHub {
       owner = "Wizek";
       repo = "jsaddle";

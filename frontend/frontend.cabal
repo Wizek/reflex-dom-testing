@@ -22,8 +22,11 @@ executable frontend
                      , jsaddle-dom
                      --  == 0.9.2.0
                      -- , common
+                     , interpolatedstring-perl6
                      , time
+                     , compose-ltr
                      , jsaddle
+                     , concurrent-extra
                      -- , jsaddle-dom
                      , ghcjs-dom
                      , reflex-dom-core

@@ -30,6 +30,7 @@ import            Reflex.Dom.Core
 import            Reflex.Dom.Core -- (liftJSM)
 import            Language.Javascript.JSaddle.Warp
 import            Language.Javascript.JSaddle       (liftJSM, JSM)
+import qualified  Language.Javascript.JSaddle       as JSA
 -- import            Reflex.
 import            Test.Hspec
 -- import            Data.Text
@@ -43,11 +44,16 @@ import qualified  GHCJS.DOM                         as DOM (currentDocument, cur
 import qualified  JSDOM                             as DOM (syncPoint)
 import qualified  GHCJS.DOM.Document                as DOM -- (Document, createElement, getBody)
 import qualified  GHCJS.DOM.Element                 as DOM
+import qualified  GHCJS.DOM.Element                 as DOMe
 import qualified  GHCJS.DOM.HTMLElement             as DOM
 import            Data.Time
+import            ComposeLTR
+import            Text.InterpolatedString.Perl6
+import qualified  Control.Concurrent.Lock           as Lock
 
 debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
 
+prnt :: (MonadIO m, Show a) => a -> m ()
 prnt = io . print
 
 -- hspec $ do
@@ -62,42 +68,62 @@ main = do
 
 
     mainWidget $ do
-      pb <- getPostBuild
-      pb2 <- delay 0.1 pb
       text " hi1 "
-      text " hi3 "
-      time <- io getCurrentTime
-      ticker <- tickLossy 0.1 time
-      as <- count ticker
-      display as
+      -- time <- io getCurrentTime
+      -- ticker <- tickLossy 0.1 time
+      -- as <- count ticker
+      -- display as
+      -- MonadWidget m => m (Event ())
+      bClick <- button "test"
+      text " "
+      cnt <- count bClick
+      display cnt
       text " hi4 "
 
-    DOM.getInnerHTML sel >>= p
+    DOM.syncPoint
 
-    io $ threadDelay $ 1000 * 1000
-    DOM.getInnerHTML sel >>= p
 
-    io $ threadDelay $ 1000 * 1000
-    DOM.getInnerHTML sel >>= p
-
-    mainWidget $ do
-      pb <- getPostBuild
-      pb2 <- delay 0.1 pb
-      text " hi1 "
-      text " hi3 "
-      time <- io getCurrentTime
-      ticker <- tickLossy 0.1 time
-      as <- count ticker
-      display as
-      text " hi4 "
+    io $ threadDelay $ 1000 * 10
 
     DOM.getInnerHTML sel >>= p
+    -- io $ threadDelay $ 10000
+    DOM.syncPoint
+    -- DOMe.getElementsByTagName sel "button" >>= JSA.toJSVal >>= prnt
+    lock <- io Lock.newAcquired
+    jsm $ do
+      jsFun <- JSA.eval [q|(function(cb) {
+        try {
+          console.log(123)
 
-    io $ threadDelay $ 1000 * 1000
-    DOM.getInnerHTML sel >>= p
+          var a = document.getElementsByTagName("button")[0].click()
 
-    io $ threadDelay $ 1000 * 1000
+          setTimeout(function () {
+            cb()
+          })
+
+          // console.log(a)
+        } catch (e) {
+          console.error(e)
+        }
+      })|]
+      -- JSA.call jsFun JSA.global [()]
+      JSA.call jsFun JSA.global
+        [ JSA.asyncFunction $ \_ _ _ -> do
+            prnt 123
+            io $ Lock.release lock
+        ]
+
+
+    -- io $ threadDelay $ 10000
+    DOM.syncPoint
+    io $ Lock.wait lock
+    DOM.syncPoint
+    -- io $ threadDelay $ 1000 * 100
+    io $ threadDelay $ 1000 * 100
+
     DOM.getInnerHTML sel >>= p
+    -- io $ threadDelay $ 10000
+
 
 
 jsm = liftJSM
