@@ -51,6 +51,8 @@ import            ComposeLTR
 import            Text.InterpolatedString.Perl6
 import            Data.IORef
 import            Debug.Trace
+import            Data.Monoid
+import qualified  Data.Text as T
 import qualified  Control.Concurrent.Lock           as Lock
 
 debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
@@ -58,6 +60,8 @@ debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
 prnt :: (MonadIO m, Show a) => a -> m ()
 prnt = io . print
 
+
+tshow = T.pack . show
 
 
 -- hspec $ do
@@ -77,7 +81,18 @@ widget exfiltrate = do
   text " hi2 "
 
   (event, trigger :: IO () -> IO ()) <- newTriggerEvent
-  io $ writeIORef exfiltrate  trigger
+  io $ writeIORef exfiltrate trigger
+
+  -- elAttr "script" ("type" =: "text/javascript") $ dynText $ constDyn "console.log(345555)"
+  -- text "<script> console.log(345555) </script>"
+  -- el "script" $ text "console.log(345555)"
+  -- elAttr "script" ("type" =: "text/javascript") $ text "console.log(34555523)"
+
+
+  dyn $ ffor cnt $ \currentCount -> do
+    el "script" $ text $ "console.log(" <> tshow currentCount <> ")"
+
+  -- text "<script> console.log(345555) </script>"
 
   performEvent_ $ ffor (event :: Event t (IO ())) $ \cont -> do
     prnt "performEvent_ inside"
