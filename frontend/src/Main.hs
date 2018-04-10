@@ -50,6 +50,7 @@ import            Data.Time
 import            ComposeLTR
 import            Text.InterpolatedString.Perl6
 import            Data.IORef
+import            Debug.Trace
 import qualified  Control.Concurrent.Lock           as Lock
 
 debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
@@ -60,7 +61,7 @@ prnt = io . print
 
 
 -- hspec $ do
-widget :: forall t m. MonadWidget t m => IORef (() -> IO ()) ->  m ()
+widget :: forall t m. MonadWidget t m => IORef (IO () -> IO ()) ->  m ()
 widget exfiltrate = do
   text " hi1 "
   -- time <- io getCurrentTime
@@ -71,13 +72,17 @@ widget exfiltrate = do
   bClick <- button "test"
   text " "
   cnt <- count bClick
-  display cnt
+  display $ fmap (trace "trace") $ cnt
 
-  (event, trigger :: () -> IO ()) <- newTriggerEvent
-  io $ writeIORef exfiltrate trigger
+  text " hi2 "
 
-  performEvent_ $ ffor (event :: Event t ()) $ \_ -> do
-    io $ print 123123332
+  (event, trigger :: IO () -> IO ()) <- newTriggerEvent
+  io $ writeIORef exfiltrate  trigger
+
+  performEvent_ $ ffor (event :: Event t (IO ())) $ \cont -> do
+    prnt "performEvent_ inside"
+    io $ cont
+    -- io $ print 123123332
 
   noop
 
@@ -96,7 +101,6 @@ main = do
 
     trigger <- io $ readIORef triggerRef
 
-    io $ trigger ()
       -- withRenderHook (\a -> do
       --     prnt 2
       --     ret <- a
@@ -112,7 +116,12 @@ main = do
     DOM.syncPoint
 
 
-    io $ threadDelay $ 1000 * 10
+    -- io $ threadDelay $ 1000 * 10
+    l1 <- io $ Lock.newAcquired
+    io $ trigger $ do
+      print 999999
+      Lock.release l1
+    io $ Lock.wait l1
 
     DOM.getInnerHTML sel >>= p
     -- io $ threadDelay $ 10000
@@ -149,9 +158,17 @@ main = do
     DOM.syncPoint
     -- io $ threadDelay $ 1000 * 100
     -- withRenderHook (id) noop
-    io $ threadDelay $ 1000 * 100
+    -- io $ threadDelay $ 1000 * 100
+
+    l2 <- io $ Lock.newAcquired
+    io $ trigger $ do
+      print 999999
+      Lock.release l2
+
+    io $ Lock.wait l2
 
     DOM.getInnerHTML sel >>= p
+
     -- io $ threadDelay $ 10000
 
 
