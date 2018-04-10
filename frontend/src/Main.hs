@@ -47,9 +47,10 @@ import qualified  GHCJS.DOM.Element                 as DOM
 import qualified  GHCJS.DOM.Element                 as DOMe
 import qualified  GHCJS.DOM.HTMLElement             as DOM
 import            Data.Time
-import            ComposeLTR
+import            ComposeLTR                        hiding ((<$))
 import            Text.InterpolatedString.Perl6
 import            Data.IORef
+import            GHC.Stack
 import            Debug.Trace
 import            Data.Monoid
 import qualified  Data.Text as T
@@ -64,8 +65,10 @@ prnt = io . print
 tshow = T.pack . show
 
 
+type HCS = HasCallStack
+
 -- hspec $ do
-widget :: forall t m. MonadWidget t m => IORef (IO () -> IO ()) ->  m ()
+widget :: forall t m. (HCS, MonadWidget t m) => IORef (IO () -> IO ()) ->  m ()
 widget exfiltrate = do
   text " hi1 "
   -- time <- io getCurrentTime
@@ -89,14 +92,21 @@ widget exfiltrate = do
   -- elAttr "script" ("type" =: "text/javascript") $ text "console.log(34555523)"
 
 
-  dyn $ ffor cnt $ \currentCount -> do
-    el "script" $ text $ "console.log(" <> tshow currentCount <> ")"
+  -- dyn $ ffor cnt $ \currentCount -> do
+  --   el "script" $ text $ "console.log(" <> tshow currentCount <> ")"
+
+  dRender <- holdDyn False (True <$ event)
+
+  dyn $ ffor dRender  $ \case
+    False -> noop
+    True  -> do
+      el "script" $ text $ "window.reflexRenderDone()"
 
   -- text "<script> console.log(345555) </script>"
 
-  performEvent_ $ ffor (event :: Event t (IO ())) $ \cont -> do
-    prnt "performEvent_ inside"
-    io $ cont
+  -- performEvent_ $ ffor (event :: Event t (IO ())) $ \cont -> do
+  --   prnt "performEvent_ inside"
+  --   io $ cont
     -- io $ print 123123332
 
   noop
@@ -110,7 +120,30 @@ main = do
     (Just doc) <- DOM.currentDocument
     (Just sel) <- DOM.getBody doc
 
+    -- reflexRender <- io $ Lock.newAcquired
+    reflexRender <- io $ Lock.new
+
     triggerRef <- io $ newIORef $ const noop
+    jsm $ do
+      jsFun <- JSA.eval [q|(function(cb) {
+        try {
+          console.log("reflexRenderDone defined")
+          window.reflexRenderDone = function () {
+            console.log("reflexRenderDone called")
+            cb()
+          }
+        } catch (e) {
+          console.error(e)
+        }
+      })|]
+      JSA.call jsFun JSA.global
+        [ JSA.asyncFunction $ \_ _ _ -> do
+            prnt "trying to release"
+            io $ Lock.release reflexRender
+        ]
+
+    prnt "asd 1"
+
 
     mainWidget (widget triggerRef)
 
@@ -132,17 +165,24 @@ main = do
 
 
     -- io $ threadDelay $ 1000 * 10
-    l1 <- io $ Lock.newAcquired
-    io $ trigger $ do
-      print 999999
-      Lock.release l1
-    io $ Lock.wait l1
+    -- l1 <- io $ Lock.newAcquired
+    -- io $ trigger $ do
+    --   print 999999
+    --   Lock.release l1
+    -- io $ Lock.wait l1
+    prnt "asd 2"
+
+
+    io $ Lock.acquire reflexRender
+    io $ trigger noop
+    io $ Lock.wait reflexRender
 
     DOM.getInnerHTML sel >>= p
     -- io $ threadDelay $ 10000
     DOM.syncPoint
     -- DOMe.getElementsByTagName sel "button" >>= JSA.toJSVal >>= prnt
     lock <- io Lock.newAcquired
+
     jsm $ do
       jsFun <- JSA.eval [q|(function(cb) {
         try {
@@ -175,12 +215,17 @@ main = do
     -- withRenderHook (id) noop
     -- io $ threadDelay $ 1000 * 100
 
-    l2 <- io $ Lock.newAcquired
-    io $ trigger $ do
-      print 999999
-      Lock.release l2
+    -- l2 <- io $ Lock.newAcquired
+    -- io $ trigger $ do
+    --   print 999999
+    --   Lock.release l2
 
-    io $ Lock.wait l2
+    prnt "asd"
+    io $ Lock.acquire reflexRender
+    io $ trigger noop
+    io $ Lock.wait reflexRender
+
+    -- io $ Lock.wait l2
 
     DOM.getInnerHTML sel >>= p
 
