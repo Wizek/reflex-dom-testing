@@ -49,6 +49,7 @@ import qualified  GHCJS.DOM.HTMLElement             as DOM
 import            Data.Time
 import            ComposeLTR
 import            Text.InterpolatedString.Perl6
+import            Data.IORef
 import qualified  Control.Concurrent.Lock           as Lock
 
 debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
@@ -56,7 +57,30 @@ debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
 prnt :: (MonadIO m, Show a) => a -> m ()
 prnt = io . print
 
+
+
 -- hspec $ do
+widget :: forall t m. MonadWidget t m => IORef (() -> IO ()) ->  m ()
+widget exfiltrate = do
+  text " hi1 "
+  -- time <- io getCurrentTime
+  -- ticker <- tickLossy 0.1 time
+  -- as <- count ticker
+  -- display as
+  -- MonadWidget m => m (Event ())
+  bClick <- button "test"
+  text " "
+  cnt <- count bClick
+  display cnt
+
+  (event, trigger :: () -> IO ()) <- newTriggerEvent
+  io $ writeIORef exfiltrate trigger
+
+  performEvent_ $ ffor (event :: Event t ()) $ \_ -> do
+    io $ print 123123332
+
+  noop
+
 main :: IO ()
 main = do
   debugAndWait 3198 $ do
@@ -66,19 +90,24 @@ main = do
     (Just doc) <- DOM.currentDocument
     (Just sel) <- DOM.getBody doc
 
+    triggerRef <- io $ newIORef $ const noop
 
-    mainWidget $ do
-      text " hi1 "
-      -- time <- io getCurrentTime
-      -- ticker <- tickLossy 0.1 time
-      -- as <- count ticker
-      -- display as
-      -- MonadWidget m => m (Event ())
-      bClick <- button "test"
-      text " "
-      cnt <- count bClick
-      display cnt
-      text " hi4 "
+    mainWidget (widget triggerRef)
+
+    trigger <- io $ readIORef triggerRef
+
+    io $ trigger ()
+      -- withRenderHook (\a -> do
+      --     prnt 2
+      --     ret <- a
+      --     prnt 3
+      --     pure ret
+      --     -- pure
+      --   ) $ do
+      --   prnt 4444
+      --   text " hi6 "
+
+      -- noop
 
     DOM.syncPoint
 
@@ -119,6 +148,7 @@ main = do
     io $ Lock.wait lock
     DOM.syncPoint
     -- io $ threadDelay $ 1000 * 100
+    -- withRenderHook (id) noop
     io $ threadDelay $ 1000 * 100
 
     DOM.getInnerHTML sel >>= p
