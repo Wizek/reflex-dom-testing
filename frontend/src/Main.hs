@@ -75,7 +75,8 @@ widget1 = do
   bClick <- button "test"
   text " "
   cnt <- count bClick
-  display $ fmap (trace "trace") $ cnt
+  -- display $ fmap (trace "trace") $ cnt
+  display cnt
 
   text " hi2 "
 
@@ -96,72 +97,61 @@ mainTestwidget exfiltrate widgetToTest = do
 
   noop
 
+
+-- testWidget :: forall t m. (HCS, MonadWidget t m) => (forall m. MonadWidget t m => m ()) -> JSM (JSM ())
+testWidget :: (forall t m. MonadWidget t m => m ()) -> JSM (JSM ())
+testWidget widgetToTest = do
+  reflexRender <- io $ Lock.new
+
+  triggerRef <- io $ newIORef $ const noop
+  jsm $ do
+    jsFun <- JSA.eval [q|(function(cb) {
+      try {
+        console.log("reflexRenderDone defined")
+        window.reflexRenderDone = function () {
+          console.log("reflexRenderDone called")
+          cb()
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    })|]
+    JSA.call jsFun JSA.global
+      [ JSA.asyncFunction $ \_ _ _ -> do
+          -- prnt "trying to release"
+          io $ Lock.release reflexRender
+      ]
+
+  mainWidget (mainTestwidget triggerRef widgetToTest)
+  trigger <- io $ readIORef triggerRef
+  renderSync <- mkRenderSync trigger reflexRender
+
+  renderSync
+  -- return noop
+  return renderSync
+
 main :: IO ()
 main = do
   debugAndWait 3198 $ do
-    let
-      p = io . putStrLn . ("p: " ++)
+    -- Just body <- (\doc-> sequenceA ) =<< DOM.currentDocument
+    -- Just body <- (() DOM.getBody) =<< DOM.currentDocument
+    -- Just body <- (\doc-> DOM.getBody =<< sequenceA (pure doc) ) =<< DOM.currentDocument
 
-    (Just doc) <- DOM.currentDocument
-    (Just sel) <- DOM.getBody doc
+    Just doc  <- DOM.currentDocument
+    Just body <- DOM.getBody doc
 
-    -- reflexRender <- io $ Lock.newAcquired
-    reflexRender <- io $ Lock.new
+    renderSync <- testWidget widget1
 
-    triggerRef <- io $ newIORef $ const noop
-    jsm $ do
-      jsFun <- JSA.eval [q|(function(cb) {
-        try {
-          console.log("reflexRenderDone defined")
-          window.reflexRenderDone = function () {
-            console.log("reflexRenderDone called")
-            cb()
-          }
-        } catch (e) {
-          console.error(e)
-        }
-      })|]
-      JSA.call jsFun JSA.global
-        [ JSA.asyncFunction $ \_ _ _ -> do
-            prnt "trying to release"
-            io $ Lock.release reflexRender
-        ]
-
-    mainWidget (mainTestwidget triggerRef widget1)
-    trigger <- io $ readIORef triggerRef
-    renderSync <- mkRenderSync trigger reflexRender
-
-    renderSync
-
-    DOM.getInnerHTML sel >>= p
+    DOM.getInnerHTML body >>= prnt
     lock <- io Lock.newAcquired
 
-    jsm $ do
-      jsFun <- JSA.eval [q|(function(cb) {
-        try {
-          console.log(123)
-
-          var a = document.getElementsByTagName("button")[0].click()
-
-          setTimeout(function () {
-            cb()
-          })
-
-          // console.log(a)
-        } catch (e) {
-          console.error(e)
-        }
-      })|]
-      JSA.call jsFun JSA.global
-        [ JSA.asyncFunction $ \_ _ _ -> do
-            prnt 123
-            io $ Lock.release lock
-        ]
-
+    jsEval [q| document.getElementsByTagName("button")[0].click() |]
     renderSync
 
-    DOM.getInnerHTML sel >>= p
+    DOM.getInnerHTML body >>= prnt
 
+
+jsEval = jsm . JSA.eval
 
 
 mkRenderSync trigger reflexRender = do
