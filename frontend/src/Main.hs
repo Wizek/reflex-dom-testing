@@ -67,15 +67,11 @@ tshow = T.pack . show
 
 type HCS = HasCallStack
 
--- hspec $ do
-widget :: forall t m. (HCS, MonadWidget t m) => IORef (IO () -> IO ()) ->  m ()
-widget exfiltrate = do
+
+
+widget1 :: forall t m. (HCS, MonadWidget t m) =>  m ()
+widget1 = do
   text " hi1 "
-  -- time <- io getCurrentTime
-  -- ticker <- tickLossy 0.1 time
-  -- as <- count ticker
-  -- display as
-  -- MonadWidget m => m (Event ())
   bClick <- button "test"
   text " "
   cnt <- count bClick
@@ -83,17 +79,13 @@ widget exfiltrate = do
 
   text " hi2 "
 
+-- hspec $ do
+mainTestwidget :: forall t m. (HCS, MonadWidget t m) => IORef (IO () -> IO ()) -> m () ->  m ()
+mainTestwidget exfiltrate widgetToTest = do
+  widgetToTest
+
   (event, trigger :: IO () -> IO ()) <- newTriggerEvent
   io $ writeIORef exfiltrate trigger
-
-  -- elAttr "script" ("type" =: "text/javascript") $ dynText $ constDyn "console.log(345555)"
-  -- text "<script> console.log(345555) </script>"
-  -- el "script" $ text "console.log(345555)"
-  -- elAttr "script" ("type" =: "text/javascript") $ text "console.log(34555523)"
-
-
-  -- dyn $ ffor cnt $ \currentCount -> do
-  --   el "script" $ text $ "console.log(" <> tshow currentCount <> ")"
 
   dRender <- holdDyn False (True <$ event)
 
@@ -101,13 +93,6 @@ widget exfiltrate = do
     False -> noop
     True  -> do
       el "script" $ text $ "window.reflexRenderDone()"
-
-  -- text "<script> console.log(345555) </script>"
-
-  -- performEvent_ $ ffor (event :: Event t (IO ())) $ \cont -> do
-  --   prnt "performEvent_ inside"
-  --   io $ cont
-    -- io $ print 123123332
 
   noop
 
@@ -142,45 +127,13 @@ main = do
             io $ Lock.release reflexRender
         ]
 
-    prnt "asd 1"
-
-
-    mainWidget (widget triggerRef)
-
+    mainWidget (mainTestwidget triggerRef widget1)
     trigger <- io $ readIORef triggerRef
+    renderSync <- mkRenderSync trigger reflexRender
 
-      -- withRenderHook (\a -> do
-      --     prnt 2
-      --     ret <- a
-      --     prnt 3
-      --     pure ret
-      --     -- pure
-      --   ) $ do
-      --   prnt 4444
-      --   text " hi6 "
-
-      -- noop
-
-    DOM.syncPoint
-
-
-    -- io $ threadDelay $ 1000 * 10
-    -- l1 <- io $ Lock.newAcquired
-    -- io $ trigger $ do
-    --   print 999999
-    --   Lock.release l1
-    -- io $ Lock.wait l1
-    prnt "asd 2"
-
-
-    io $ Lock.acquire reflexRender
-    io $ trigger noop
-    io $ Lock.wait reflexRender
+    renderSync
 
     DOM.getInnerHTML sel >>= p
-    -- io $ threadDelay $ 10000
-    DOM.syncPoint
-    -- DOMe.getElementsByTagName sel "button" >>= JSA.toJSVal >>= prnt
     lock <- io Lock.newAcquired
 
     jsm $ do
@@ -199,38 +152,23 @@ main = do
           console.error(e)
         }
       })|]
-      -- JSA.call jsFun JSA.global [()]
       JSA.call jsFun JSA.global
         [ JSA.asyncFunction $ \_ _ _ -> do
             prnt 123
             io $ Lock.release lock
         ]
 
-
-    -- io $ threadDelay $ 10000
-    DOM.syncPoint
-    io $ Lock.wait lock
-    DOM.syncPoint
-    -- io $ threadDelay $ 1000 * 100
-    -- withRenderHook (id) noop
-    -- io $ threadDelay $ 1000 * 100
-
-    -- l2 <- io $ Lock.newAcquired
-    -- io $ trigger $ do
-    --   print 999999
-    --   Lock.release l2
-
-    prnt "asd"
-    io $ Lock.acquire reflexRender
-    io $ trigger noop
-    io $ Lock.wait reflexRender
-
-    -- io $ Lock.wait l2
+    renderSync
 
     DOM.getInnerHTML sel >>= p
 
-    -- io $ threadDelay $ 10000
 
+
+mkRenderSync trigger reflexRender = do
+  return $ do
+    io $ Lock.acquire reflexRender
+    io $ trigger noop
+    io $ Lock.wait reflexRender
 
 
 jsm = liftJSM
