@@ -53,7 +53,9 @@ import            Data.IORef
 import            GHC.Stack
 import            Debug.Trace
 import            Control.Lens
-import            Control.Exception
+import            System.IO.Unsafe
+-- import            Control.Exception
+import            Control.Monad.Catch
 import            System.Exit
 import            Data.Monoid
 import qualified  Data.Text as T
@@ -76,8 +78,8 @@ type HCS = HasCallStack
 
 widget1 :: forall t m. (HCS, MonadWidget t m) =>  m ()
 widget1 = do
-  button "Increment"
-  let bClick = never
+  bClick <- button "Increment"
+  -- let bClick = never
   cnt <- count bClick
   elAttr "div" ("id" =: "output") $ do
     display cnt
@@ -164,15 +166,32 @@ mbind = (join .) . fmap . (fmap join .) . T.mapM
 
 act `shouldBe` exp
   | act == exp = prnt  $ "OK: " <> show act
-  | otherwise  = io $ evaluate $ error $ "FAIL, actual: " <> show act <> "expected: " <> show exp
+  | otherwise  = do
+      prnt $ "FAIL, actual: " <> show act <> ", expected: " <> show exp
+      mainThreadId <- io $ readIORef globalThreadId
+      io $ killThread mainThreadId
+
+  -- | otherwise  = io $ evaluate $ error $ "FAIL, actual: " <> show act <> "expected: " <> show exp
 
 act `shouldReturn` exp = act >>= (`shouldBe` exp)
+
+
+globalThreadId :: IORef ThreadId
+globalThreadId = unsafePerformIO $ newIORef undefined
+
+-- errorHandler mainThreadId cont = do
+--   io $ catch $ cont $ \(e :: SomeException) -> do
+--     prnt e
+--     io $ killThread mainThreadId
 
 main :: IO ()
 main = do
   mainThreadId <- myThreadId
+
+  writeIORef globalThreadId mainThreadId
   -- forkIO $ do
 
+  -- debugAndWait 3198 $ errorHandler mainThreadId $ do
   debugAndWait 3198 $ do
     -- Just body <- (\doc-> sequenceA ) =<< DOM.currentDocument
     -- Just body <- (() DOM.getBody) =<< DOM.currentDocument
@@ -185,19 +204,21 @@ main = do
 
     (renderSync, elem) <- testWidget widget1
 
-    io $ killThread mainThreadId
+    -- io $ killThread mainThreadId
+
     -- throwTo
     -- io exitFailure
+
     -- DOM.getInnerHTML elem >>= prnt
     -- jsEval [q| document.getElementsByTagName("button")[0].click() |]
 
-    -- io $ throwIO (SomeException "")
-    -- io $ throwIO (toException $ ErrorCall "ffff")
-    -- io $ evaluate $ error "asdasd"
+    -- -- io $ throwIO (SomeException "")
+    -- -- io $ throwIO (toException $ ErrorCall "ffff")
+    -- -- io $ evaluate $ error "asdasd"
 
     -- -- a <- elem ^.js1 "getElementById" "output" . js "innerHTML"
-    -- (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
-    --   -- `shouldReturn` Just "0"
+    (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
+      `shouldReturn` Just "0"
     -- error "asdasd"
 
     -- -- a <- elem ^.js "innerHTML"
@@ -207,16 +228,23 @@ main = do
     -- -- (elem ^.js1 "getElementById" "output" . js "innerHTML") `shouldReturn` "0"
 
 
-    -- -- jsEval [q| document.getElementsByTagName("button")[0].click() |]
-    -- -- JSA.jsg "console" ^. js1 "log" "asdkjasd"
-    -- elem ^.js1 "getElementsByTagName" "button" . js "0" . js0 "click"
-    -- renderSync
+    -- jsEval [q| document.getElementsByTagName("button")[0].click() |]
+    -- JSA.jsg "console" ^. js1 "log" "asdkjasd"
+    elem ^.js1 "getElementsByTagName" "button" . js "0" . js0 "click"
+    renderSync
 
-    -- (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
-    --   `shouldReturn` Just "1"
-    -- -- prnt =<< JSA.fromJSVal @T.Text a
+    (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
+      `shouldReturn` Just "1"
+    -- prnt =<< JSA.fromJSVal @T.Text a
 
     -- -- DOM.getInnerHTML elem >>= prnt
+    noop
+
+  -- prnt "delay"
+  -- io $ threadDelay $ 1000 * 5000
+  -- prnt "kill"
+  -- io $ killThread childId
+  -- io $ threadDelay $ 1000 * 5000
 
 
 jsEval = jsm . JSA.eval

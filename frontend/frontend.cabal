@@ -25,6 +25,7 @@ executable frontend
                      , interpolatedstring-perl6
                      , time
                      , lens
+                     , exceptions
                      , text
                      , compose-ltr
                      , jsaddle
