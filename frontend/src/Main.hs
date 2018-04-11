@@ -75,8 +75,6 @@ tshow = T.pack . show
 type HCS = HasCallStack
 
 
-
-
 widget1 :: forall t m. (HCS, MonadWidget t m) =>  m ()
 widget1 = do
   bClick <- button "Increment"
@@ -85,7 +83,6 @@ widget1 = do
   elAttr "div" ("id" =: "output") $ do
     display cnt
 
--- hspec $ do
 mainTestwidget :: forall t m. (HCS, MonadWidget t m) => IORef (IO () -> IO (), El t) -> m () ->  m ()
 mainTestwidget exfiltrate widgetToTest = do
   (elem, _) <- elClass' "div" "test-bench" widgetToTest
@@ -103,12 +100,10 @@ mainTestwidget exfiltrate widgetToTest = do
   noop
 
 
--- testWidget :: forall t m. (HCS, MonadWidget t m) => (forall m. MonadWidget t m => m ()) -> JSM (JSM ())
 testWidget :: (forall t m. MonadWidget t m => m ()) -> JSM (JSM (), DOM.Element)
 testWidget widgetToTest = do
   reflexRender <- io $ Lock.new
 
-  -- triggerRef <- io $ newIORef $ const noop
   triggerRef <- io $ newIORef undefined
   jsm $ do
     jsFun <- JSA.eval [q|(function(cb) {
@@ -124,7 +119,6 @@ testWidget widgetToTest = do
     })|]
     JSA.call jsFun JSA.global
       [ JSA.asyncFunction $ \_ _ _ -> do
-          -- prnt "trying to release"
           io $ Lock.release reflexRender
       ]
 
@@ -133,33 +127,8 @@ testWidget widgetToTest = do
   renderSync <- mkRenderSync trigger reflexRender
 
   renderSync
-  -- return noop
   return (renderSync, _el_element elem)
 
-(<<$>>) = fmap . fmap
-(<<*>>) = (<*>) . (<*>)
-
-main1 :: IO ()
-main1 = do
-  -- Just foo <- action1
-  -- Just bar <- action2 foo
-
-  -- Just bar <- pure <<$>> action2 <<*>> action1
-  -- Just bar <- action2 `mbind` action1
-  -- Just bar <- action2 foo
-
-  Just bar <- join <$> (traverse action2 =<< action1)
-
-  print bar
-
-data A = A   deriving (Show)
-data B = B   deriving (Show)
-
-action1 :: IO (Maybe A)
-action1 = return $ Just A
-
-action2 :: A -> IO (Maybe B)
-action2 A = return $ Just B
 
 mbind :: (Monad m, Monad n, Functor m, Traversable n) => (a -> m (n b)) -> m (n a) -> m (n b)
 mbind = (join .) . fmap . (fmap join .) . T.mapM
@@ -172,19 +141,10 @@ act `shouldBe` exp
   | act == exp = io $ putStrLn $ "OK: " <> show act
   | otherwise  = do
       error $ "FAIL, actual: " <> show act <> ", expected: " <> show exp
-      -- io $ putStrLn $ "FAIL, actual: " <> show act <> ", expected: " <> show exp
-      -- mainThreadId <- io $ readIORef globalThreadId
-      -- io $ killThread mainThreadId
-
-  -- | otherwise  = io $ evaluate $ error $ "FAIL, actual: " <> show act <> "expected: " <> show exp
 
 act `shouldReturn` exp = act >>= (`shouldBe` exp)
 
 
--- globalThreadId :: IORef ThreadId
--- globalThreadId = unsafePerformIO $ newIORef undefined
-
--- errorHandler :: (MonadCatch m, Exception e) => m a -> (e -> m a) -> m a
 errorHandler :: (MonadCatch m, MonadIO m) => ThreadId -> m a -> m ()
 errorHandler mainThreadId cont = do
    (void cont) `catch` \(e :: SomeException) -> do
@@ -195,11 +155,6 @@ main :: IO ()
 main = do
   mainThreadId <- myThreadId
 
-  -- writeIORef globalThreadId mainThreadId
-  -- forkIO $ do
-
-  -- debugAndWait 3198 $ errorHandler mainThreadId $ do
-  -- debugAndWait 3198 $ do
   debugAndWait 3198 $ errorHandler mainThreadId $ do
 
     (renderSync, elem) <- testWidget widget1
@@ -227,31 +182,6 @@ mkRenderSync trigger reflexRender = do
 
 jsm = liftJSM
 
--- testRender :: MonadWidget t m => m () -> JSM () -> JSM ()
--- testRender attachee tests = do
-
---   mainWidget attachee
---   tests
-
---   noop
-
--- -- testRender :: MonadWidget t m => m a -> m Text
--- -- testRender :: MonadWidget t m => m () -> m ()
--- testRender :: MonadWidget t m => m () -> m () -> m ()
--- testRender attachee tests = do
---   (event, trigger) <- newTriggerEvent
---   showHide <- holdDyn True event
-
---   dyn $ ffor showHide $ \case
---     True  -> do
---       attachee
---       tests
---       io $ trigger False
---       noop
-
---     False -> noop
-
---   noop
 
 noop = pure ()
 io = liftIO
