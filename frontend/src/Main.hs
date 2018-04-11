@@ -29,7 +29,7 @@ import            Prelude
 import            Reflex.Dom.Core
 import            Reflex.Dom.Core -- (liftJSM)
 import            Language.Javascript.JSaddle.Warp
-import            Language.Javascript.JSaddle       (liftJSM, JSM, js1, js0, jsf, js)
+import            Language.Javascript.JSaddle       (liftJSM, JSM, js1, js0, jsf, js, jsg)
 import qualified  Language.Javascript.JSaddle       as JSA
 -- import            Reflex.
 -- import            Test.Hspec
@@ -179,13 +179,14 @@ main = do
 
     (renderSync, elem) <- testWidget widget1
 
-    DOM.getInnerHTML elem >>= prnt
+    -- DOM.getInnerHTML elem >>= prnt
     -- jsEval [q| document.getElementsByTagName("button")[0].click() |]
 
     -- a <- elem ^.js1 "getElementById" "output" . js "innerHTML"
+    a <- jsg "document" ^. js1 "getElementById" "output" . js "innerHTML"
     -- a <- elem ^.js "innerHTML"
     -- JSA.showJSValue a
-    -- prnt =<< JSA.fromJSVal @T.Text a
+    prnt =<< JSA.fromJSVal @T.Text a
 
     -- (elem ^.js1 "getElementById" "output" . js "innerHTML") `shouldReturn` "0"
 
@@ -195,7 +196,11 @@ main = do
     elem ^.js1 "getElementsByTagName" "button" . js "0" . js0 "click"
     renderSync
 
-    DOM.getInnerHTML elem >>= prnt
+    a <- jsg "document" ^. js1 "getElementById" "output" . js "innerHTML"
+
+    prnt =<< JSA.fromJSVal @T.Text a
+
+    -- DOM.getInnerHTML elem >>= prnt
 
 
 jsEval = jsm . JSA.eval
