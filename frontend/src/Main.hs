@@ -17,6 +17,7 @@
 {-# language ScopedTypeVariables #-}
 {-# language TypeSynonymInstances #-}
 {-# language ExtendedDefaultRules #-}
+{-# language PartialTypeSignatures #-}
 {-# language DuplicateRecordFields #-}
 {-# language MultiParamTypeClasses #-}
 {-# language NoPartialTypeSignatures #-}
@@ -164,35 +165,42 @@ mbind :: (Monad m, Monad n, Functor m, Traversable n) => (a -> m (n b)) -> m (n 
 mbind = (join .) . fmap . (fmap join .) . T.mapM
 
 
+-- shouldBe :: (HCS, _) => _
+shouldBe :: (HCS, Show a, MonadIO m, Eq a) => a -> a -> m ()
+-- =
 act `shouldBe` exp
   | act == exp = io $ putStrLn $ "OK: " <> show act
   | otherwise  = do
-      io $ putStrLn $ "FAIL, actual: " <> show act <> ", expected: " <> show exp
-      mainThreadId <- io $ readIORef globalThreadId
-      io $ killThread mainThreadId
+      error $ "FAIL, actual: " <> show act <> ", expected: " <> show exp
+      -- io $ putStrLn $ "FAIL, actual: " <> show act <> ", expected: " <> show exp
+      -- mainThreadId <- io $ readIORef globalThreadId
+      -- io $ killThread mainThreadId
 
   -- | otherwise  = io $ evaluate $ error $ "FAIL, actual: " <> show act <> "expected: " <> show exp
 
 act `shouldReturn` exp = act >>= (`shouldBe` exp)
 
 
-globalThreadId :: IORef ThreadId
-globalThreadId = unsafePerformIO $ newIORef undefined
+-- globalThreadId :: IORef ThreadId
+-- globalThreadId = unsafePerformIO $ newIORef undefined
 
--- errorHandler mainThreadId cont = do
---   io $ catch $ cont $ \(e :: SomeException) -> do
---     prnt e
---     io $ killThread mainThreadId
+-- errorHandler :: (MonadCatch m, Exception e) => m a -> (e -> m a) -> m a
+errorHandler :: (MonadCatch m, MonadIO m) => ThreadId -> m a -> m ()
+errorHandler mainThreadId cont = do
+   (void cont) `catch` \(e :: SomeException) -> do
+    prnt e
+    io $ killThread mainThreadId
 
 main :: IO ()
 main = do
   mainThreadId <- myThreadId
 
-  writeIORef globalThreadId mainThreadId
+  -- writeIORef globalThreadId mainThreadId
   -- forkIO $ do
 
   -- debugAndWait 3198 $ errorHandler mainThreadId $ do
-  debugAndWait 3198 $ do
+  -- debugAndWait 3198 $ do
+  debugAndWait 3198 $ errorHandler mainThreadId $ do
 
     (renderSync, elem) <- testWidget widget1
 
@@ -204,6 +212,7 @@ main = do
 
     (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
       `shouldReturn` Just "1"
+
 
 
 jsEval = jsm . JSA.eval
