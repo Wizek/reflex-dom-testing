@@ -29,10 +29,10 @@ import            Prelude
 import            Reflex.Dom.Core
 import            Reflex.Dom.Core -- (liftJSM)
 import            Language.Javascript.JSaddle.Warp
-import            Language.Javascript.JSaddle       (liftJSM, JSM)
+import            Language.Javascript.JSaddle       (liftJSM, JSM, js1, js0, jsf, js)
 import qualified  Language.Javascript.JSaddle       as JSA
 -- import            Reflex.
-import            Test.Hspec
+-- import            Test.Hspec
 -- import            Data.Text
 import            Control.Monad.Trans
 import            Control.Concurrent
@@ -52,9 +52,11 @@ import            Text.InterpolatedString.Perl6
 import            Data.IORef
 import            GHC.Stack
 import            Debug.Trace
+import            Control.Lens
 import            Data.Monoid
 import qualified  Data.Text as T
 import qualified  Control.Concurrent.Lock           as Lock
+import qualified Data.Traversable as T
 
 debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
 
@@ -69,41 +71,39 @@ type HCS = HasCallStack
 
 
 
+
 widget1 :: forall t m. (HCS, MonadWidget t m) =>  m ()
 widget1 = do
-  text " hi1 "
-  bClick <- button "test"
-  text " "
+  bClick <- button "Increment"
   cnt <- count bClick
-  -- display $ fmap (trace "trace") $ cnt
-  display cnt
-
-  text " hi2 "
+  elAttr "div" ("id" =: "output") $ do
+    display cnt
 
 -- hspec $ do
-mainTestwidget :: forall t m. (HCS, MonadWidget t m) => IORef (IO () -> IO ()) -> m () ->  m ()
+mainTestwidget :: forall t m. (HCS, MonadWidget t m) => IORef (IO () -> IO (), El t) -> m () ->  m ()
 mainTestwidget exfiltrate widgetToTest = do
-  widgetToTest
+  (elem, _) <- elClass' "div" "test-bench" widgetToTest
 
   (event, trigger :: IO () -> IO ()) <- newTriggerEvent
-  io $ writeIORef exfiltrate trigger
+  io $ writeIORef exfiltrate (trigger, elem)
 
   dRender <- holdDyn False (True <$ event)
 
   dyn $ ffor dRender  $ \case
     False -> noop
     True  -> do
-      el "script" $ text $ "window.reflexRenderDone()"
+      el "script" $ text "window.reflexRenderDone()"
 
   noop
 
 
 -- testWidget :: forall t m. (HCS, MonadWidget t m) => (forall m. MonadWidget t m => m ()) -> JSM (JSM ())
-testWidget :: (forall t m. MonadWidget t m => m ()) -> JSM (JSM ())
+testWidget :: (forall t m. MonadWidget t m => m ()) -> JSM (JSM (), DOM.Element)
 testWidget widgetToTest = do
   reflexRender <- io $ Lock.new
 
-  triggerRef <- io $ newIORef $ const noop
+  -- triggerRef <- io $ newIORef $ const noop
+  triggerRef <- io $ newIORef undefined
   jsm $ do
     jsFun <- JSA.eval [q|(function(cb) {
       try {
@@ -123,12 +123,47 @@ testWidget widgetToTest = do
       ]
 
   mainWidget (mainTestwidget triggerRef widgetToTest)
-  trigger <- io $ readIORef triggerRef
+  (trigger, elem) <- io $ readIORef triggerRef
   renderSync <- mkRenderSync trigger reflexRender
 
   renderSync
   -- return noop
-  return renderSync
+  return (renderSync, _el_element elem)
+
+(<<$>>) = fmap . fmap
+(<<*>>) = (<*>) . (<*>)
+
+main1 :: IO ()
+main1 = do
+  -- Just foo <- action1
+  -- Just bar <- action2 foo
+
+  -- Just bar <- pure <<$>> action2 <<*>> action1
+  -- Just bar <- action2 `mbind` action1
+  -- Just bar <- action2 foo
+
+  Just bar <- join <$> (traverse action2 =<< action1)
+
+  print bar
+
+data A = A   deriving (Show)
+data B = B   deriving (Show)
+
+action1 :: IO (Maybe A)
+action1 = return $ Just A
+
+action2 :: A -> IO (Maybe B)
+action2 A = return $ Just B
+
+mbind :: (Monad m, Monad n, Functor m, Traversable n) => (a -> m (n b)) -> m (n a) -> m (n b)
+mbind = (join .) . fmap . (fmap join .) . T.mapM
+
+
+act `shouldBe` exp
+  | act == exp = prnt  $ "OK: " <> show act
+  | otherwise  = error $ "FAIL, actual: " <> show act <> "expected: " <> show exp
+
+act `shouldReturn` exp = act >>= (`shouldBe` exp)
 
 main :: IO ()
 main = do
@@ -137,18 +172,30 @@ main = do
     -- Just body <- (() DOM.getBody) =<< DOM.currentDocument
     -- Just body <- (\doc-> DOM.getBody =<< sequenceA (pure doc) ) =<< DOM.currentDocument
 
-    Just doc  <- DOM.currentDocument
-    Just body <- DOM.getBody doc
+    -- Just body <- DOM.getBody `mbind` DOM.currentDocument
 
-    renderSync <- testWidget widget1
+    -- Just doc  <- DOM.currentDocument
+    -- Just body <- DOM.getBody doc
 
-    DOM.getInnerHTML body >>= prnt
-    lock <- io Lock.newAcquired
+    (renderSync, elem) <- testWidget widget1
 
-    jsEval [q| document.getElementsByTagName("button")[0].click() |]
+    DOM.getInnerHTML elem >>= prnt
+    -- jsEval [q| document.getElementsByTagName("button")[0].click() |]
+
+    -- a <- elem ^.js1 "getElementById" "output" . js "innerHTML"
+    -- a <- elem ^.js "innerHTML"
+    -- JSA.showJSValue a
+    -- prnt =<< JSA.fromJSVal @T.Text a
+
+    -- (elem ^.js1 "getElementById" "output" . js "innerHTML") `shouldReturn` "0"
+
+
+    -- jsEval [q| document.getElementsByTagName("button")[0].click() |]
+    -- JSA.jsg "console" ^. js1 "log" "asdkjasd"
+    elem ^.js1 "getElementsByTagName" "button" . js "0" . js0 "click"
     renderSync
 
-    DOM.getInnerHTML body >>= prnt
+    DOM.getInnerHTML elem >>= prnt
 
 
 jsEval = jsm . JSA.eval

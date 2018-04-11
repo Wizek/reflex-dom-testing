@@ -24,6 +24,7 @@ executable frontend
                      -- , common
                      , interpolatedstring-perl6
                      , time
+                     , lens
                      , text
                      , compose-ltr
                      , jsaddle
