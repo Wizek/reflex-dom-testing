@@ -61,7 +61,7 @@ import            System.Exit
 import            Data.Monoid
 import qualified  Data.Text as T
 import qualified  Control.Concurrent.Lock           as Lock
-import qualified Data.Traversable as T
+import qualified  Data.Traversable as T
 
 debugAndWait p f = debug p f >> forever (threadDelay $ 1000 * 1000)
 
@@ -70,7 +70,6 @@ prnt = io . print
 
 
 tshow = T.pack . show
-
 
 type HCS = HasCallStack
 
@@ -105,22 +104,15 @@ testWidget widgetToTest = do
   reflexRender <- io $ Lock.new
 
   triggerRef <- io $ newIORef undefined
-  jsm $ do
-    jsFun <- JSA.eval [q|(function(cb) {
-      try {
-        console.log("reflexRenderDone defined")
-        window.reflexRenderDone = function () {
-          console.log("reflexRenderDone called")
-          cb()
-        }
-      } catch (e) {
-        console.error(e)
-      }
-    })|]
-    JSA.call jsFun JSA.global
-      [ JSA.asyncFunction $ \_ _ _ -> do
-          io $ Lock.release reflexRender
-      ]
+
+  -- TODO: handle exceptions safely inside JSaddle
+  jsFun <- JSA.eval [q|(function(cb) {
+    window.reflexRenderDone = cb
+  })|]
+  JSA.call jsFun JSA.global
+    [ JSA.asyncFunction $ \_ _ _ -> do
+        io $ Lock.release reflexRender
+    ]
 
   mainWidget (mainTestwidget triggerRef widgetToTest)
   (trigger, elem) <- io $ readIORef triggerRef
