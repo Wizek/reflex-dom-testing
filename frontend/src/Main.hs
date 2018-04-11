@@ -53,6 +53,8 @@ import            Data.IORef
 import            GHC.Stack
 import            Debug.Trace
 import            Control.Lens
+import            Control.Exception
+import            System.Exit
 import            Data.Monoid
 import qualified  Data.Text as T
 import qualified  Control.Concurrent.Lock           as Lock
@@ -74,7 +76,8 @@ type HCS = HasCallStack
 
 widget1 :: forall t m. (HCS, MonadWidget t m) =>  m ()
 widget1 = do
-  bClick <- button "Increment"
+  button "Increment"
+  let bClick = never
   cnt <- count bClick
   elAttr "div" ("id" =: "output") $ do
     display cnt
@@ -161,12 +164,15 @@ mbind = (join .) . fmap . (fmap join .) . T.mapM
 
 act `shouldBe` exp
   | act == exp = prnt  $ "OK: " <> show act
-  | otherwise  = error $ "FAIL, actual: " <> show act <> "expected: " <> show exp
+  | otherwise  = io $ evaluate $ error $ "FAIL, actual: " <> show act <> "expected: " <> show exp
 
 act `shouldReturn` exp = act >>= (`shouldBe` exp)
 
 main :: IO ()
 main = do
+  mainThreadId <- myThreadId
+  -- forkIO $ do
+
   debugAndWait 3198 $ do
     -- Just body <- (\doc-> sequenceA ) =<< DOM.currentDocument
     -- Just body <- (() DOM.getBody) =<< DOM.currentDocument
@@ -179,28 +185,38 @@ main = do
 
     (renderSync, elem) <- testWidget widget1
 
+    io $ killThread mainThreadId
+    -- throwTo
+    -- io exitFailure
     -- DOM.getInnerHTML elem >>= prnt
     -- jsEval [q| document.getElementsByTagName("button")[0].click() |]
 
-    -- a <- elem ^.js1 "getElementById" "output" . js "innerHTML"
-    a <- jsg "document" ^. js1 "getElementById" "output" . js "innerHTML"
-    -- a <- elem ^.js "innerHTML"
-    -- JSA.showJSValue a
-    prnt =<< JSA.fromJSVal @T.Text a
+    -- io $ throwIO (SomeException "")
+    -- io $ throwIO (toException $ ErrorCall "ffff")
+    -- io $ evaluate $ error "asdasd"
 
-    -- (elem ^.js1 "getElementById" "output" . js "innerHTML") `shouldReturn` "0"
+    -- -- a <- elem ^.js1 "getElementById" "output" . js "innerHTML"
+    -- (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
+    --   -- `shouldReturn` Just "0"
+    -- error "asdasd"
+
+    -- -- a <- elem ^.js "innerHTML"
+    -- -- JSA.showJSValue a
+    -- -- prnt =<< JSA.fromJSVal @T.Text a
+
+    -- -- (elem ^.js1 "getElementById" "output" . js "innerHTML") `shouldReturn` "0"
 
 
-    -- jsEval [q| document.getElementsByTagName("button")[0].click() |]
-    -- JSA.jsg "console" ^. js1 "log" "asdkjasd"
-    elem ^.js1 "getElementsByTagName" "button" . js "0" . js0 "click"
-    renderSync
+    -- -- jsEval [q| document.getElementsByTagName("button")[0].click() |]
+    -- -- JSA.jsg "console" ^. js1 "log" "asdkjasd"
+    -- elem ^.js1 "getElementsByTagName" "button" . js "0" . js0 "click"
+    -- renderSync
 
-    a <- jsg "document" ^. js1 "getElementById" "output" . js "innerHTML"
+    -- (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
+    --   `shouldReturn` Just "1"
+    -- -- prnt =<< JSA.fromJSVal @T.Text a
 
-    prnt =<< JSA.fromJSVal @T.Text a
-
-    -- DOM.getInnerHTML elem >>= prnt
+    -- -- DOM.getInnerHTML elem >>= prnt
 
 
 jsEval = jsm . JSA.eval
