@@ -16,7 +16,7 @@ cabal-version:       >=1.10
 
 executable frontend
   main-is:             Main.hs
-  ghc-options:         -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -O2 -threaded -rtsopts -with-rtsopts=-N
   -- other-extensions:
   build-depends:       base >=4.9 && <4.11
                      , jsaddle-dom
