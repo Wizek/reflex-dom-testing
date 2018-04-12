@@ -139,15 +139,20 @@ act `shouldReturn` exp = act >>= (`shouldBe` exp)
 
 errorHandler :: (MonadCatch m, MonadIO m) => ThreadId -> m a -> m ()
 errorHandler mainThreadId cont = do
-   (void cont) `catch` \(e :: SomeException) -> do
+  (void cont) `catch` \(e :: SomeException) -> do
     prnt e
     io $ killThread mainThreadId
 
+
+runTests :: Int -> JSM () -> IO ()
+runTests port jsmCont = do
+  mainThreadId <- myThreadId
+  debugAndWait port $ errorHandler mainThreadId $ jsmCont
+
+
 main :: IO ()
 main = do
-  mainThreadId <- myThreadId
-
-  debugAndWait 3198 $ errorHandler mainThreadId $ do
+  runTests 3198 $ do
 
     (renderSync, elem) <- testWidget widget1
 
