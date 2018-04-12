@@ -153,17 +153,29 @@ runTests port jsmCont = do
 main :: IO ()
 main = do
   runTests 3198 $ do
+    do
+      (renderSync, elem) <- testWidget widget1
 
-    (renderSync, elem) <- testWidget widget1
+      (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
+        `shouldReturn` Just "0"
 
-    (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
-      `shouldReturn` Just "0"
+      elem ^.js1 "getElementsByTagName" "button" . js "0" . js0 "click"
+      renderSync
 
-    elem ^.js1 "getElementsByTagName" "button" . js "0" . js0 "click"
-    renderSync
+      (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
+        `shouldReturn` Just "1"
 
-    (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
-      `shouldReturn` Just "1"
+    do
+      (renderSync, elem) <- testWidget widget1
+
+      (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
+        `shouldReturn` Just "0"
+
+      elem ^.js1 "getElementsByTagName" "button" . js "0" . js0 "click"
+      renderSync
+
+      (jsg "document" ^. js1 "getElementById" "output" . js "innerHTML" >>= JSA.fromJSVal)
+        `shouldReturn` Just "1"
 
 
 
